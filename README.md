@@ -1,227 +1,115 @@
 # DataCoreX Vagrant Environment
 
-This Vagrant configuration automatically sets up a development environment for the [DataCoreX](https://github.com/Lintshiwe/DataCoreX.git) project and **automatically starts the application** when the VM boots up.
+This repository contains a Vagrant configuration that provisions an Ubuntu 22.04
+virtual machine, clones the
+[DataCoreX](https://github.com/Lintshiwe/DataCoreX) project, installs every
+required dependency, and starts both the React frontend and Spring Boot backend
+automatically with systemd services.
+
+---
 
 ## Prerequisites
 
-Before using this Vagrant setup, ensure you have the following installed:
+- [VirtualBox](https://www.virtualbox.org/wiki/Downloads) 6.1 or newer with
+  virtualization enabled in BIOS/UEFI
+- [Vagrant](https://www.vagrantup.com/downloads) 2.3 or newer
+- At least **4 GB** of free RAM and **20 GB** of disk space
 
-- [Vagrant](https://www.vagrantup.com/downloads) (latest version)
-- [VirtualBox](https://www.virtualbox.org/wiki/Downloads) (as the VM provider)
+---
 
 ## Quick Start
 
-1. **Clone or download this repository**
-2. **Navigate to the project directory**
-
-   ```bash
-   cd Vagrant_DataCoreX
-   ```
-
-3. **Start the VM**
-
-   ```bash
-   vagrant up
-   ```
-
-   This will:
-
-   - Download the Ubuntu 20.04 LTS base image
-   - Create and configure the virtual machine
-   - Install necessary development tools
-   - Clone the DataCoreX repository
-   - Automatically detect and set up project dependencies
-   - **🚀 Automatically start the DataCoreX application**
-
-4. **Wait for auto-start (about 1-2 minutes)**
-
-   The application will automatically detect the project type and start:
-
-   - Node.js projects: `npm start`, `npm run dev`, or `node server.js`
-   - Python Flask: `flask run` or `python app.py`
-   - Python Django: `python manage.py runserver`
-   - Docker projects: `docker-compose up` or Docker build/run
-
-5. **Access your application**
-
-   Check your browser at:
-
-   - http://localhost:3000 (Node.js/React)
-   - http://localhost:5000 (Flask)
-   - http://localhost:8000 (Django)
-   - http://localhost:8080 (Alternative)
-
-## Auto-Start Features
-
-### 🔄 Automatic Application Startup
-
-The VM includes a systemd service that automatically:
-
-- Detects the project type (Node.js, Python, Docker)
-- Runs the appropriate startup command
-- Restarts the application if it crashes
-- Starts on every VM boot
-
-### 📊 Service Management
-
 ```bash
-# Check if the application is running
-sudo systemctl status datacorex
-
-# View live application logs
-sudo journalctl -u datacorex -f
-
-# Restart the application
-sudo systemctl restart datacorex
-
-# Stop the application
-sudo systemctl stop datacorex
-
-# Start the application
-sudo systemctl start datacorex
-```
-
-### 🛠️ Manual Control
-
-If you need to run the application manually:
-
-```bash
-# Stop the auto-service first
-sudo systemctl stop datacorex
-
-# Run manually
-/home/vagrant/start-datacorex.sh
-```
-
-## VM Configuration
-
-### System Specifications
-
-- **OS**: Ubuntu 20.04 LTS (focal64)
-- **Memory**: 2GB RAM
-- **CPUs**: 2 cores
-- **Disk**: Dynamic allocation
-
-### Installed Software
-
-- Git, curl, wget, vim, nano
-- Node.js 18.x with npm
-- Python 3 with pip
-- Docker and Docker Compose
-- Development tools (build-essential, etc.)
-
-### Port Forwarding
-
-The following ports are forwarded from your host machine to the VM:
-
-| Host Port | VM Port | Purpose                    |
-| --------- | ------- | -------------------------- |
-| 3000      | 3000    | React/Node.js applications |
-| 5000      | 5000    | Flask/Python applications  |
-| 8000      | 8000    | Django/General web apps    |
-| 8080      | 8080    | Alternative web port       |
-| 8081      | 80      | HTTP services              |
-
-## Usage
-
-### Starting the VM
-
-```bash
+git clone https://github.com/Lintshiwe/Vagrant_DataCoreX.git
+cd Vagrant_DataCoreX
 vagrant up
 ```
 
-### Accessing the VM
+The first run can take 10–15 minutes because the VM will:
+
+1. Install Node.js 18, Temurin JDK 21, Git, build tools, etc.
+2. Clone the upstream DataCoreX repository (or reset it if it already exists).
+3. Install frontend dependencies (`npm ci`).
+4. Prime backend dependencies (`./mvnw dependency:go-offline`).
+5. Register and start two systemd services:
+   - `datacorex-frontend` → `npm start` on port **3000**
+   - `datacorex-backend` → `./mvnw spring-boot:run` on port **8081**
+
+Once provisioning completes you can open:
+
+- Frontend UI: <http://localhost:3000>
+- Backend API: <http://localhost:8081>
+
+SSH access remains available with `vagrant ssh`.
+
+---
+
+## Managing Services
+
+The services restart automatically if they crash and they start on every boot.
+Useful commands inside the VM (`vagrant ssh`):
 
 ```bash
-vagrant ssh
+sudo systemctl status datacorex-frontend
+sudo systemctl status datacorex-backend
+sudo journalctl -u datacorex-frontend -f   # Tail frontend logs
+sudo journalctl -u datacorex-backend -f    # Tail backend logs
+sudo systemctl restart datacorex-backend   # Restart Spring Boot
 ```
 
-### Stopping the VM
+---
+
+## Vagrant Lifecycle Commands
 
 ```bash
-vagrant halt
+vagrant up        # Create and provision the VM
+vagrant halt      # Gracefully shut it down
+vagrant reload    # Restart and re-apply networking config
+vagrant destroy   # Remove the VM entirely
+vagrant provision # Re-run the provisioning script
 ```
 
-### Restarting the VM
+_Tip_: provisioning is idempotent—running `vagrant provision` keeps the cloned
+DataCoreX workspace aligned with the latest `origin/main` branch.
 
-```bash
-vagrant reload
-```
+---
 
-### Destroying the VM
+## Customising the VM
 
-```bash
-vagrant destroy
-```
+- Adjust memory/CPU in the `config.vm.provider` block of the Vagrantfile.
+- Add additional forwarded ports if you expose more services.
+- Insert extra provisioning logic in the shell script section (e.g. seed data,
+  install monitoring tools, etc.).
 
-### Checking VM Status
-
-```bash
-vagrant status
-```
-
-## Project Structure
-
-After the VM is set up, you'll find:
-
-- **DataCoreX project**: `/home/vagrant/DataCoreX`
-- **Shared folder**: `/vagrant` (synced with your host directory)
-
-## Automatic Setup Features
-
-The Vagrant provisioning script automatically:
-
-1. Updates the system packages
-2. Installs development tools and runtimes
-3. Clones the DataCoreX repository
-4. Detects project type and installs dependencies:
-   - Node.js projects: runs `npm install`
-   - Python projects: installs from `requirements.txt`
-   - Python/Pipenv projects: sets up pipenv environment
-5. Sets up environment files from `.env.example` if available
+---
 
 ## Troubleshooting
 
-### Common Issues
+| Problem             | Fix                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| VM fails to boot    | Ensure virtualization (VT-x/AMD-V) is enabled and Hyper-V is disabled on Windows (or use VirtualBox 7.0.6+). |
+| Port already in use | Edit the `config.vm.network` section to pick different host ports.                                           |
+| Service not running | `vagrant ssh` → `sudo systemctl status datacorex-frontend datacorex-backend`                                 |
+| Want a clean slate  | `vagrant destroy -f && vagrant up`                                                                           |
 
-1. **VM fails to start**: Ensure VirtualBox is installed and virtualization is enabled in BIOS
-2. **Port conflicts**: Check if any of the forwarded ports are already in use on your host
-3. **Slow performance**: Increase VM memory in the Vagrantfile if needed
-4. **Network issues**: Try `vagrant reload` to restart networking
+For deeper logs check `vagrant up --debug` or inspect
+`/var/log/cloud-init.log` inside the VM.
 
-### Useful Commands
+---
 
-```bash
-# Reload Vagrantfile configuration
-vagrant reload
+## What Gets Installed
 
-# Re-run provisioning script
-vagrant provision
+- Ubuntu 22.04 (bento box)
+- Node.js 18 LTS & npm
+- Temurin JDK 21
+- Git, build-essential, unzip, curl, ca-certificates
+- DataCoreX source code at `/home/vagrant/DataCoreX`
+- systemd services `datacorex-frontend` and `datacorex-backend`
 
-# SSH with X11 forwarding (if needed)
-vagrant ssh -- -X
-
-# View VM logs
-vagrant ssh -c "journalctl -f"
-```
-
-## Customization
-
-You can modify the `Vagrantfile` to:
-
-- Change VM specifications (memory, CPUs)
-- Add/remove port forwarding rules
-- Install additional software in the provisioning script
-- Modify network configuration
-
-## Support
-
-If you encounter issues:
-
-1. Check the DataCoreX repository documentation
-2. Review Vagrant logs: `vagrant up --debug`
-3. Ensure all prerequisites are properly installed
+---
 
 ## License
 
-This Vagrant configuration is provided as-is for development purposes.
+This repository only contains infrastructure scaffolding; refer to the
+DataCoreX project for application licensing. Use this configuration for local
+development and testing purposes.
